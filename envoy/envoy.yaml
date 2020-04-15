@@ -1,0 +1,71 @@
+admin:
+  access_log_path: /tmp/admin_access.log
+  address:
+    socket_address: { address: 0.0.0.0, port_value: 9000 }
+
+static_resources:
+  listeners:
+    - name: listerner
+      address:
+        socket_address: { address: 0.0.0.0, port_value: 10000 }
+      filter_chains:
+        - filters:
+            - name: envoy.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+                stat_prefix: ingress_http
+                codec_type: AUTO
+                route_config:
+                  name: local_route
+                  virtual_hosts:
+                    - name: localhost
+                      domains: ["localhost:10000"]
+                      routes:
+                        - match: { prefix: "/" }
+                          route: { cluster: app }
+                    - name: localhost_2
+                      domains: ["127.0.0.1:10000"]
+                      routes:
+                        - match: { path: "/nothing" }
+                          route: { cluster: app }
+                        - match: { prefix: "/" }
+                          route: { cluster: app }
+                          per_filter_config:
+                            envoy.ext_authz:
+                              disabled: true
+                http_filters:
+                  - name: envoy.ext_authz
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.config.filter.http.ext_authz.v2.ExtAuthz
+                      grpc_service:
+                        envoy_grpc:
+                          cluster_name: ext-authz
+                        timeout: 0.5s
+                  - name: envoy.router
+  clusters:
+    - name: ext-authz
+      type: strict_dns
+      http2_protocol_options: {}
+      load_assignment:
+        cluster_name: ext-authz
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: ext-authz
+                      port_value: 50051
+      connect_timeout: 2s
+    - name: app
+      connect_timeout: 0.25s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: nginx
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: app
+                      port_value: 80

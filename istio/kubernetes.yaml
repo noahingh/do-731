@@ -1,0 +1,163 @@
+# Note that you should specify these virables, HOSTNAME, NAMESPACE and GATEWAY 
+# before apply this yaml file into your cluster. 
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: nginx
+spec:
+  workloadSelector:
+    labels:
+      app: nginx
+  configPatches:
+    - applyTo: HTTP_FILTER
+      match:
+        context: SIDECAR_INBOUND
+        listener:
+          filterChain:
+            filter:
+              name: "envoy.http_connection_manager"
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.ext_authz
+          config:
+            grpc_service:
+              google_grpc:
+                target_uri: ext-authz:50051
+                stat_prefix: ext_authz
+              timeout: 1s
+
+    - applyTo: VIRTUAL_HOST
+      match:
+        context: SIDECAR_INBOUND
+        routeConfiguration:
+          vhost:
+            name: "inbound|http|80"
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: external
+          domains: ["HOSTNAME"]
+          routes:
+            - match: { prefix: /nothing }
+              route: { cluster: "inbound|80|http|nginx.pointsvc.svc.cluster.local" }
+              per_filter_config:
+                envoy.ext_authz:
+                  disabled: true
+            - match: { prefix: / }
+              route: { cluster: "inbound|80|http|nginx.pointsvc.svc.cluster.local" }
+
+    - applyTo: VIRTUAL_HOST
+      match:
+        context: SIDECAR_INBOUND
+        routeConfiguration:
+          vhost:
+            name: "inbound|http|80"
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: internal
+          domains: ["nginx.NAMESPACE.svc.cluster.local"]
+          routes:
+            - match: { prefix: / }
+              route: { cluster: "inbound|80|http|nginx.pointsvc.svc.cluster.local" }
+              per_filter_config:
+                envoy.ext_authz:
+                  disabled: true
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: nginx
+spec:
+  gateways:
+    - mesh
+    - GATEWAY
+  hosts:
+    - nginx.pointsvc.svc.cluster.local
+    - HOST
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: nginx
+            port:
+              number: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+spec:
+  selector:
+    app: nginx
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ext-authz
+spec:
+  selector:
+    app: ext-authz
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: grpc
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: nginx
+spec:
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - image: nginx
+          name: nginx
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128M"
+            limits:
+              cpu: "100m"
+              memory: "128M"
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+      restartPolicy: Always
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: ext-authz
+spec:
+  template:
+    metadata:
+      labels:
+        app: ext-authz
+    spec:
+      containers:
+        - image: hanjunlee/ext-authz
+          name: ext-authz
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128M"
+            limits:
+              cpu: "100m"
+              memory: "128M"
+          ports:
+            - name: grpc
+              containerPort: 50051
+              protocol: TCP
+      restartPolicy: Always
