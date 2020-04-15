@@ -40,12 +40,12 @@ spec:
           domains: ["HOSTNAME"]
           routes:
             - match: { prefix: /nothing }
-              route: { cluster: "inbound|80|http|nginx.pointsvc.svc.cluster.local" }
+              route: { cluster: "inbound|80|http|nginx.NAMESPACE.svc.cluster.local" }
               per_filter_config:
                 envoy.ext_authz:
                   disabled: true
             - match: { prefix: / }
-              route: { cluster: "inbound|80|http|nginx.pointsvc.svc.cluster.local" }
+              route: { cluster: "inbound|80|http|nginx.NAMESPACE.svc.cluster.local" }
 
     - applyTo: VIRTUAL_HOST
       match:
@@ -60,7 +60,7 @@ spec:
           domains: ["nginx.NAMESPACE.svc.cluster.local"]
           routes:
             - match: { prefix: / }
-              route: { cluster: "inbound|80|http|nginx.pointsvc.svc.cluster.local" }
+              route: { cluster: "inbound|80|http|nginx.NAMESPACE.svc.cluster.local" }
               per_filter_config:
                 envoy.ext_authz:
                   disabled: true
@@ -74,7 +74,7 @@ spec:
     - mesh
     - GATEWAY
   hosts:
-    - nginx.pointsvc.svc.cluster.local
+    - nginx.NAMESPACE.svc.cluster.local
     - HOST
   http:
     - match:
