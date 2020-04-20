@@ -32,12 +32,12 @@ spec:
         context: SIDECAR_INBOUND
         routeConfiguration:
           vhost:
-            name: "inbound|http|80"
+            name: "nginx:80"
       patch:
         operation: INSERT_BEFORE
         value:
           name: external
-          domains: ["HOSTNAME"]
+          domains: ["HOSTNAME:80", "HOSTNAME:443"]
           routes:
             - match: { prefix: /nothing }
               route: { cluster: "inbound|80|http|nginx.NAMESPACE.svc.cluster.local" }
@@ -52,7 +52,7 @@ spec:
         context: SIDECAR_INBOUND
         routeConfiguration:
           vhost:
-            name: "inbound|http|80"
+            name: "nginx:80"
       patch:
         operation: INSERT_BEFORE
         value:
@@ -75,7 +75,7 @@ spec:
     - GATEWAY
   hosts:
     - nginx.NAMESPACE.svc.cluster.local
-    - HOST
+    - "HOSTNAME"
   http:
     - match:
         - uri:
