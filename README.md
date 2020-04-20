@@ -1,6 +1,6 @@
 # DO-731
 
-The objective is to investigate the `EnvoyFilter` of Istio over `v1.13` through the example [per-route config](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter). The per-route configuration is to set the external authorzation for specific routes.
+The objective of this repository is to investigate the `EnvoyFilter` of Istio over `v1.13` through the example [per-route config](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter). The per-route configuration is to set the external authorzation for specific routes.
 
 Firstly, we would start with the Envoy. In example (i.e `./envoy/envoy.yaml`), the envoy is enabled to authorize for the host `localhost:10000` but it is disabled for the host `127.0.0.1:10000`. You can try like below.
 
